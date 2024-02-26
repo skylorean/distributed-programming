@@ -1,3 +1,5 @@
+using StackExchange.Redis;
+
 namespace Valuator;
 
 public class Program
@@ -7,7 +9,13 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         // Add services to the container.
-        builder.Services.AddRazorPages();
+        //builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect("localhost:6379"));
+        //builder.Services.AddRazorPages();
+
+        var redisConfiguration = ConfigurationOptions.Parse("localhost:6379");
+        var redisConnection = ConnectionMultiplexer.Connect(redisConfiguration);
+        builder.Services.AddSingleton<IConnectionMultiplexer>(redisConnection);
+
 
         var app = builder.Build();
 
