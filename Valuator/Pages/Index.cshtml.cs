@@ -1,20 +1,18 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using StackExchange.Redis;
+using Valuator.Redis;
 
 namespace Valuator.Pages;
 
 public class IndexModel : PageModel
 {
     private readonly ILogger<IndexModel> _logger;
-    private readonly IConnectionMultiplexer _connectionMultiplexer;
-    private readonly IDatabase _db;
+    private readonly IRedisStorage _redisStorage;
 
-    public IndexModel(ILogger<IndexModel> logger, IConnectionMultiplexer connectionMultiplexer)
+    public IndexModel(ILogger<IndexModel> logger, IRedisStorage storage)
     {
         _logger = logger;
-        _connectionMultiplexer = connectionMultiplexer;
-        _db = _connectionMultiplexer.GetDatabase();
+        _redisStorage = storage;
     }
 
     public void OnGet()
@@ -29,62 +27,61 @@ public class IndexModel : PageModel
         string id = Guid.NewGuid().ToString();
 
         string textKey = "TEXT-" + id;
-        //TODO: сохранить в БД text по ключу textKey
-        _db.StringSet(textKey, text);
-        // END TODO
+
 
         string rankKey = "RANK-" + id;
         //TODO: посчитать rank и сохранить в БД по ключу rankKey
-        double rank = CalculateRank(text);
-        _db.StringSet(rankKey, rank);
+        _redisStorage.Save(rankKey, CalculateRank(text));
         // END TODO
 
         string similarityKey = "SIMILARITY-" + id;
         //TODO: посчитать similarity и сохранить в БД по ключу similarityKey
-        int similarity = IsSimilitary(text, id) ? 1 : 0;
-        _db.StringSet(similarityKey, similarity);
+        _redisStorage.Save(similarityKey, GetSimilarity(text, id).ToString());
         // END TODO
 
+        //TODO: сохранить в БД text по ключу textKey
+        _redisStorage.Save(textKey, text);
+        // END TODO
 
         return Redirect($"summary?id={id}");
     }
 
-    private double CalculateRank(string text)
+    private string CalculateRank(string text)
     {
-        int totalCharacters = text.Length;
-        int nonAlphabeticCharacters = 0;
-
-        foreach (char character in text)
+        if (string.IsNullOrEmpty(text))
         {
-            if (!char.IsLetter(character))
+            return "0";
+        }
+
+        double len = text.Length;
+        double notLetterCount = 0;
+        foreach (char value in text)
+        {
+            if (!char.IsLetter(value))
             {
-                nonAlphabeticCharacters++;
+                notLetterCount++;
             }
         }
 
-        double contentRank = (double)nonAlphabeticCharacters / totalCharacters;
+        string count = Convert.ToString(notLetterCount / len);
 
-        return contentRank;
+        return count;
     }
 
-    public bool IsSimilitary(string text, string currentId)
+    private int GetSimilarity(string text, string id)
     {
-        var allKeys = _db.Multiplexer.GetServer(_db.Multiplexer.GetEndPoints()[0]).Keys();
+        var keys = _redisStorage.GetKeys();
+        string textPrefix = "TEXT-";
 
-        foreach (var key in allKeys)
+        foreach (var value in keys)
         {
-            bool isKeyInvalidText = key.ToString().StartsWith("TEXT-") && !key.ToString().EndsWith(currentId) && string.IsNullOrEmpty(text);
-
-            if (isKeyInvalidText)
+            if (value.StartsWith(textPrefix) && _redisStorage.Get(value) == text)
             {
-                string storedText = _db.StringGet(key);
-                if (text.Equals(storedText, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
+                return 1;
             }
         }
 
-        return false;
+        return 0;
+
     }
 }

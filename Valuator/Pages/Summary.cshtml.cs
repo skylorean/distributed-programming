@@ -1,18 +1,16 @@
 ﻿using Microsoft.AspNetCore.Mvc.RazorPages;
-using StackExchange.Redis;
+using Valuator.Redis;
 
 namespace Valuator.Pages;
 public class SummaryModel : PageModel
 {
     private readonly ILogger<SummaryModel> _logger;
-    private readonly IConnectionMultiplexer _connectionMultiplexer;
-    private readonly IDatabase _db;
+    private readonly IRedisStorage _redisStorage;
 
-    public SummaryModel(ILogger<SummaryModel> logger, IConnectionMultiplexer connectionMultiplexer)
+    public SummaryModel(ILogger<SummaryModel> logger, IRedisStorage storage)
     {
         _logger = logger;
-        _connectionMultiplexer = connectionMultiplexer;
-        _db = _connectionMultiplexer.GetDatabase();
+        _redisStorage = storage;
     }
 
     public double Rank { get; set; }
@@ -23,36 +21,9 @@ public class SummaryModel : PageModel
         _logger.LogDebug(id);
 
         //TODO: проинициализировать свойства Rank и Similarity значениями из БД
-        string rankKey = "RANK-" + id;
-        if (_db.KeyExists(rankKey))
-        {
-            string rankString = _db.StringGet(rankKey);
-            _logger.LogDebug($"Raw Rank String: {rankString}");
-            try
-            {
-                Rank = Convert.ToDouble(rankString, System.Globalization.CultureInfo.InvariantCulture);
-            }
-            catch (FormatException ex)
-            {
-                // Обработка случая, когда значение не может быть преобразовано в double
-                _logger.LogError($"Ошибка преобразования значения {rankKey} в тип double: {ex.Message}");
-            }
-        }
+        Rank = Convert.ToDouble(_redisStorage.Get($"RANK-{id}"));
 
-        string similarityKey = "SIMILARITY-" + id;
-        if (_db.KeyExists(similarityKey))
-        {
-            int similarity;
-            if (int.TryParse(_db.StringGet(similarityKey), out similarity))
-            {
-                Similarity = similarity;
-            }
-            else
-            {
-                // Обработка случая, когда значение не может быть преобразовано в int
-                _logger.LogError($"Ошибка преобразования значения {similarityKey} в тип int");
-            }
-        }
+        Similarity = Convert.ToDouble(_redisStorage.Get($"SIMILARITY-{id}"));
         // END TODO
     }
 }
