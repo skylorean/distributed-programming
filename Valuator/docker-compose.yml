@@ -1,0 +1,21 @@
+version: "3"
+
+services:
+  valuator:
+    image: valuator
+    build:
+      context: .
+      dockerfile: Valuator/Dockerfile
+    restart: unless-stopped  
+    ports:
+      - '5141:5141'
+    environment:
+      - "URLS=http://*:5141/"
+      - "ASPNETCORE_URLS=http://*:5141/"
+    depends_on: 
+      - redis
+  redis:
+    image: redis:6.2-alpine
+    restart: always
+    ports:
+    - "6379:6379"

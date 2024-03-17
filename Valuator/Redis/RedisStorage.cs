@@ -7,14 +7,17 @@ namespace Valuator.Redis
         private readonly IConnectionMultiplexer _connection;
         private readonly IConfiguration _configuration;
         private IDatabase _db;
+        private IServer _server;
 
         public RedisStorage(IConfiguration configuration)
         {
             _configuration = configuration;
 
-            var host = _configuration["RedisValues:HOST_NAME"];
-            _connection = ConnectionMultiplexer.Connect(host);
+            var connectionString = _configuration.GetConnectionString("redis")!;
+
+            _connection = ConnectionMultiplexer.Connect(connectionString);
             _db = _connection.GetDatabase();
+            _server = _connection.GetServer(connectionString);
         }
 
         public void Save(string key, string value)
@@ -29,9 +32,7 @@ namespace Valuator.Redis
 
         public List<string> GetKeys()
         {
-            var host = _configuration["RedisValues:HOST_NAME"];
-            var port = Convert.ToInt32(_configuration["RedisValues:HOST_PORT"]);
-            var keys = _connection.GetServer(host, port).Keys();
+            var keys = _server.Keys();
 
             return keys.Select(item => item.ToString()).ToList();
         }
