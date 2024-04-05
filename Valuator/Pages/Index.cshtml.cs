@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using NATS.Client;
+using System.Text;
 using Valuator.Redis;
 
 namespace Valuator.Pages;
@@ -28,12 +30,6 @@ public class IndexModel : PageModel
 
         string textKey = "TEXT-" + id;
 
-
-        string rankKey = "RANK-" + id;
-        //TODO: посчитать rank и сохранить в БД по ключу rankKey
-        _redisStorage.Save(rankKey, CalculateRank(text));
-        // END TODO
-
         string similarityKey = "SIMILARITY-" + id;
         //TODO: посчитать similarity и сохранить в БД по ключу similarityKey
         _redisStorage.Save(similarityKey, GetSimilarity(text, id).ToString());
@@ -43,29 +39,11 @@ public class IndexModel : PageModel
         _redisStorage.Save(textKey, text);
         // END TODO
 
+        CancellationTokenSource cts = new CancellationTokenSource();
+        ProduceAsync(cts.Token, id);
+        cts.Cancel();
+
         return Redirect($"summary?id={id}");
-    }
-
-    private string CalculateRank(string text)
-    {
-        if (string.IsNullOrEmpty(text))
-        {
-            return "0";
-        }
-
-        double len = text.Length;
-        double notLetterCount = 0;
-        foreach (char value in text)
-        {
-            if (!char.IsLetter(value))
-            {
-                notLetterCount++;
-            }
-        }
-
-        string count = Convert.ToString(notLetterCount / len);
-
-        return count;
     }
 
     private int GetSimilarity(string text, string id)
@@ -83,5 +61,20 @@ public class IndexModel : PageModel
 
         return 0;
 
+    }
+
+    static async Task ProduceAsync(CancellationToken ct, string id)
+    {
+        ConnectionFactory cf = new ConnectionFactory();
+
+        using (IConnection c = cf.CreateConnection())
+        {
+            byte[] data = Encoding.UTF8.GetBytes(id);
+            c.Publish("valuator.processing.rank", data);
+            await Task.Delay(1000);
+            c.Drain();
+
+            c.Close();
+        }
     }
 }
