@@ -60,10 +60,9 @@ public class IndexModel : PageModel
         }
 
         return 0;
-
     }
 
-    static async Task ProduceAsync(CancellationToken ct, string id)
+    private async Task ProduceAsync(CancellationToken ct, string id)
     {
         ConnectionFactory cf = new ConnectionFactory();
 

@@ -39,6 +39,7 @@ namespace RankCalculator
             {
                 return "0";
             }
+
             double len = text.Length;
             double notLetterCount = 0;
             foreach (char value in text)
