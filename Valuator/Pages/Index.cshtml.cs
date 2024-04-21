@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using NATS.Client;
 using System.Text;
+using System.Text.Json;
 using Valuator.Redis;
 
 namespace Valuator.Pages;
@@ -22,6 +23,18 @@ public class IndexModel : PageModel
 
     }
 
+    public class TextInfo
+    {
+        public string Id { get; set; }
+        public string Result { get; set; }
+
+        public TextInfo(string id, string result)
+        {
+            Id = id;
+            Result = result;
+        }
+    }
+
     public IActionResult OnPost(string text)
     {
         _logger.LogDebug(text);
@@ -31,16 +44,13 @@ public class IndexModel : PageModel
         string textKey = "TEXT-" + id;
 
         string similarityKey = "SIMILARITY-" + id;
-        //TODO: посчитать similarity и сохранить в БД по ключу similarityKey
-        _redisStorage.Save(similarityKey, GetSimilarity(text, id).ToString());
-        // END TODO
+        string similarity = GetSimilarity(text, id).ToString();
 
-        //TODO: сохранить в БД text по ключу textKey
+        _redisStorage.Save(similarityKey, similarity);
         _redisStorage.Save(textKey, text);
-        // END TODO
 
         CancellationTokenSource cts = new CancellationTokenSource();
-        ProduceAsync(cts.Token, id);
+        ProduceAsync(cts.Token, id, textKey, similarity);
         cts.Cancel();
 
         return Redirect($"summary?id={id}");
@@ -62,14 +72,20 @@ public class IndexModel : PageModel
         return 0;
     }
 
-    private async Task ProduceAsync(CancellationToken ct, string id)
+    private async Task ProduceAsync(CancellationToken ct, string id, string textKey, string similarity)
     {
         ConnectionFactory cf = new ConnectionFactory();
 
         using (IConnection c = cf.CreateConnection())
         {
             byte[] data = Encoding.UTF8.GetBytes(id);
+
+            TextInfo? info = new(textKey, similarity);
+            string jsonData = JsonSerializer.Serialize(info);
+            byte[] jsonDataEncoded = Encoding.UTF8.GetBytes(jsonData);
+
             c.Publish("valuator.processing.rank", data);
+            c.Publish("similarityCalculated", jsonDataEncoded);
             await Task.Delay(1000);
             c.Drain();
 
