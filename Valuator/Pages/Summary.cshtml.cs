@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc.RazorPages;
+using StackExchange.Redis;
 using Valuator.Redis;
 
 namespace Valuator.Pages;
@@ -16,14 +17,34 @@ public class SummaryModel : PageModel
     public double Rank { get; set; }
     public double Similarity { get; set; }
 
-    public void OnGet(string id)
+    public void OnGet(string id, string country)
     {
         _logger.LogDebug(id);
 
-        //TODO: проинициализировать свойства Rank и Similarity значениями из БД
-        Rank = Convert.ToDouble(_redisStorage.Get($"RANK-{id}"));
+        string dbEnvironmentVariable = $"DB_{country}";
+        string? dbConnection = Environment.GetEnvironmentVariable(dbEnvironmentVariable);
+        if (dbConnection == null)
+        {
+            return;
+        }
 
-        Similarity = Convert.ToDouble(_redisStorage.Get($"SIMILARITY-{id}"));
-        // END TODO
+        IDatabase db = ConnectionMultiplexer.Connect(ConfigurationOptions.Parse(dbConnection)).GetDatabase();
+
+        string? rankString = db.StringGet($"RANK-{id}");
+        string? similarityString = db.StringGet($"SIMILARITY-{id}");
+
+        if (similarityString == null || rankString == null)
+        {
+            return;
+        }
+
+        Rank = double.Parse(rankString, System.Globalization.CultureInfo.InvariantCulture);
+        Similarity = double.Parse(similarityString, System.Globalization.CultureInfo.InvariantCulture);
+
+        //TODO: проинициализировать свойства Rank и Similarity значениями из БД
+        //Rank = Convert.ToDouble(_redisStorage.Get($"RANK-{id}"));
+
+        //Similarity = Convert.ToDouble(_redisStorage.Get($"SIMILARITY-{id}"));
+        //// END TODO
     }
 }

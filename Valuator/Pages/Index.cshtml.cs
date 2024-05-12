@@ -35,35 +35,62 @@ public class IndexModel : PageModel
         }
     }
 
-    public IActionResult OnPost(string text)
+    public IActionResult OnPost(string text, string country)
     {
         _logger.LogDebug(text);
 
         string id = Guid.NewGuid().ToString();
 
-        string textKey = "TEXT-" + id;
+        _redisStorage.SaveIdToRegion(id, country);
 
-        string similarityKey = "SIMILARITY-" + id;
-        string similarity = GetSimilarity(text, id).ToString();
+        string similarity = GetSimilarity(text).ToString();
 
-        _redisStorage.Save(similarityKey, similarity);
-        _redisStorage.Save(textKey, text);
+        //string textKey = "TEXT-" + id;
 
-        CancellationTokenSource cts = new CancellationTokenSource();
-        ProduceAsync(cts.Token, id, textKey, similarity);
-        cts.Cancel();
+        //string similarityKey = "SIMILARITY-" + id;
+        //string similarity = GetSimilarity(text, id).ToString();
+
+        //_redisStorage.Save(similarityKey, similarity);
+        //_redisStorage.Save(textKey, text);
+
+        //CancellationTokenSource cts = new CancellationTokenSource();
+        //ProduceAsync(cts.Token, id, textKey, similarity);
+        //cts.Cancel();
+
+        //return Redirect($"summary?id={id}");
+        string textKey = "TEXT-";
+        _redisStorage.Save(textKey, id, text);
+
+        ConnectionFactory connectionFactory = new ConnectionFactory();
+
+        using (IConnection c = connectionFactory.CreateConnection())
+        {
+            byte[] data = Encoding.UTF8.GetBytes(id);
+            c.Publish("valuator.processing.rank", data);
+
+            TextInfo? info = new(textKey, similarity);
+            string jsonData = JsonSerializer.Serialize(info);
+
+            byte[] jsonDataEncoded = Encoding.UTF8.GetBytes(jsonData);
+
+            c.Publish("similarityCalculated", jsonDataEncoded);
+
+            c.Drain();
+
+            c.Close();
+        }
 
         return Redirect($"summary?id={id}");
     }
 
-    private int GetSimilarity(string text, string id)
+    private int GetSimilarity(string text)
     {
         var keys = _redisStorage.GetKeys();
         string textPrefix = "TEXT-";
 
         foreach (var value in keys)
         {
-            if (value.StartsWith(textPrefix) && _redisStorage.Get(value) == text)
+            if (value.StartsWith(textPrefix) && _redisStorage.Get(textPrefix, value) == text)
             {
                 return 1;
             }
