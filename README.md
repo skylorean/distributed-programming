@@ -1,1 +1,1 @@
-# Distributed programming course
+# RP
