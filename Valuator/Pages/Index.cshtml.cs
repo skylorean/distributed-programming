@@ -35,7 +35,7 @@ public class IndexModel : PageModel
         }
     }
 
-    public IActionResult OnPost(string text)
+    public async Task<IActionResult> OnPost(string text)
     {
         _logger.LogDebug(text);
 
@@ -50,7 +50,7 @@ public class IndexModel : PageModel
         _redisStorage.Save(textKey, text);
 
         CancellationTokenSource cts = new CancellationTokenSource();
-        ProduceAsync(cts.Token, id, textKey, similarity);
+        await ProduceAsync(cts.Token, id, textKey, similarity);
         cts.Cancel();
 
         return Redirect($"summary?id={id}");
@@ -86,7 +86,7 @@ public class IndexModel : PageModel
 
             c.Publish("valuator.processing.rank", data);
             c.Publish("similarityCalculated", jsonDataEncoded);
-            await Task.Delay(1000);
+            await Task.Delay(2000);
             c.Drain();
 
             c.Close();

@@ -13,6 +13,7 @@ start cmd /k dotnet run
 
 cd ../EventLogger
 start cmd /k dotnet run
+start cmd /k dotnet run
 
 cd ../Valuator
 start cmd /k dotnet run --urls "http://0.0.0.0:5001"
