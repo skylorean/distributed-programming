@@ -46,23 +46,27 @@ class Program
                     // RECEIVE
                     int bytesRec = handler.Receive(buf);
 
-                    data += Encoding.UTF8.GetString(buf, 0, bytesRec) ;
-                    if (data.IndexOf("<EOF>") > -1 || bytesRec <= 0)
+                    data += Encoding.UTF8.GetString(buf, 0, bytesRec);
+                    if (data.IndexOf("<EOF>") > -1)
                     {
                         break;
                     }
                 }
-                messages.Add(data);
+
+                data = data.Substring(0, data.Length - "<EOF>".Length);
                 Console.WriteLine("Полученный текст: {0}", data);
 
-                List<byte> byteList = new List<byte>();
-                foreach (var mes in messages)
-                {
-                    var bytes = Encoding.UTF8.GetBytes(mes + "\n");
-                    byteList.AddRange(bytes);
-                }
+                messages.Add(data);
 
-                byte[] msg = byteList.ToArray();
+                // Отправляем текст обратно клиенту
+                string textToSend = null;
+                foreach (var i in messages)
+                {
+                    textToSend += i + "\n";
+
+                }
+                textToSend += "<EOF>";
+                byte[] msg = Encoding.UTF8.GetBytes(textToSend);
 
                 // SEND
                 handler.Send(msg);
@@ -85,9 +89,9 @@ class Program
             Console.WriteLine("Запуск сервера...");
             StartListening(int.Parse(args[0]));
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
-            Console.Write(ex.ToString());   
+            Console.Write(ex.ToString());
         }
 
         Console.WriteLine("\nНажмите ENTER чтобы выйти...");

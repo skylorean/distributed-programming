@@ -11,11 +11,15 @@ class Program
     {
         try
         {
-            // Разрешение сетевых имён
-            //IPHostEntry ipHostInfo = Dns.GetHostEntry(host);
-            //IPAddress ipAddress = ipHostInfo.AddressList[0];
-            IPAddress ipAddress = IPAddress.Parse("127.0.0.1");
-            //IPAddress ipAddress = ipHostInfo.AddressList[0];
+            IPAddress ipAddress;
+            bool gotAddr = IPAddress.TryParse(host, out ipAddress);
+
+            if (!gotAddr)
+            {
+                IPHostEntry dnsInfo = Dns.GetHostEntry(host);
+
+                ipAddress = dnsInfo.AddressList[1];
+            }
 
             IPEndPoint remoteEP = new IPEndPoint(ipAddress, port);
 
@@ -30,35 +34,29 @@ class Program
                 // CONNECT
                 sender.Connect(remoteEP);
 
-                Console.WriteLine("Удалённый адрес подключения сокета: {0}",
-                    sender.RemoteEndPoint.ToString());
-
                 // Подготовка данных к отправке
-                byte[] msg = Encoding.UTF8.GetBytes(message);
+                byte[] msg = Encoding.UTF8.GetBytes(message + "<EOF>");
 
                 // SEND
                 int bytesSent = sender.Send(msg);
 
-
                 // RECEIVE
                 byte[] buf = new byte[1024];
-
                 string data = null;
                 while (true)
                 {
-                    // RECEIVE
                     int bytesRec = sender.Receive(buf);
 
                     data += Encoding.UTF8.GetString(buf, 0, bytesRec);
-                    if (bytesRec <= 0)
+                    if (data.IndexOf("<EOF>") > -1)
                     {
                         break;
                     }
                 }
 
-                //Console.WriteLine(data);
-                Console.WriteLine("Ответ: {0}",
-                    data);
+                data = data.Substring(0, data.Length - "<EOF>".Length);
+
+                Console.Write(data);
 
                 // RELEASE
                 sender.Shutdown(SocketShutdown.Both);
@@ -87,8 +85,8 @@ class Program
     {
         try
         {
-            StartClient("127.0.0.1", 7000, "hoho!<EOF>");
-            //StartClient(args[0], int.Parse(args[1]), args[2]);
+            //StartClient("localhost", 7999, "hoho");
+            StartClient(args[0], int.Parse(args[1]), args[2]);
 
         }
         catch (Exception ex)
